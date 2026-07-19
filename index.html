@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FDS-Based Transformer Insulation Classification | Shakkya</title>
+<meta name="description" content="Frequency Domain Spectroscopy analysis and machine learning classification of transformer insulation moisture condition — EE576 High Voltage Engineering mini-project." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap nav-row">
+    <div class="brand">
+      <span class="brand-mark">tan&#948;</span>
+      <span class="brand-text">FDS Insulation Classifier</span>
+    </div>
+    <nav>
+      <a href="#problem">Problem</a>
+      <a href="#characteristics">Characteristics</a>
+      <a href="#pca">PCA</a>
+      <a href="#classification">Classification</a>
+      <a href="#results">Results</a>
+      <a href="https://github.com/ishakkya145/High-Voltage-Mini-Project" target="_blank" rel="noreferrer" class="nav-cta">Repository</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow">EE576 — High Voltage Engineering · Mini Project</p>
+      <h1>Reading moisture in transformer insulation<br>from a dielectric frequency sweep.</h1>
+      <p class="hero-lede">
+        Transformer insulation fails quietly. Moisture, temperature, and oil conductivity
+        each leave a similar fingerprint on the dielectric response — this project separates
+        them, and classifies insulation condition automatically from a Frequency Domain
+        Spectroscopy scan.
+      </p>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-num">92.86%</span>
+          <span class="stat-label">test accuracy<br>(tuned SVM)</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">91.04%</span>
+          <span class="stat-label">variance in<br>first 2 components</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">22&rarr;2</span>
+          <span class="stat-label">features reduced<br>via PCA</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <svg viewBox="0 0 420 340" class="hero-svg">
+        <defs>
+          <linearGradient id="curveDry" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#5b7fb5"/>
+            <stop offset="100%" stop-color="#5b7fb5" stop-opacity="0.3"/>
+          </linearGradient>
+        </defs>
+        <g stroke="#2a2420" stroke-opacity="0.15">
+          <line x1="40" y1="30" x2="40" y2="290"/>
+          <line x1="40" y1="290" x2="390" y2="290"/>
+        </g>
+        <path d="M 40 260 Q 90 250 130 200 Q 170 150 210 145 Q 250 160 290 220 Q 330 260 380 275"
+              fill="none" stroke="#b5502e" stroke-width="2.5"/>
+        <path d="M 40 90 Q 90 95 130 110 Q 170 130 210 160 Q 250 200 290 240 Q 330 265 380 280"
+              fill="none" stroke="#5b7fb5" stroke-width="2.5"/>
+        <text x="200" y="315" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#6b6459">frequency (Hz), log scale</text>
+        <text x="20" y="160" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#6b6459" transform="rotate(-90 20 160)">loss tangent, tan&#948;</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section id="problem" class="section">
+  <div class="wrap">
+    <p class="section-kicker">00 — The problem</p>
+    <h2>One curve, three overlapping causes.</h2>
+    <div class="prose-col">
+      <p>
+        Power transformer insulation is made of cellulose — oil, paper, and pressboard.
+        Its condition governs how long the transformer lasts. Moisture is the main enemy:
+        it lowers dielectric strength and accelerates ageing, often invisibly, until failure.
+      </p>
+      <p>
+        Frequency Domain Spectroscopy (FDS) is the standard non-destructive way to check
+        insulation condition. It measures the dielectric loss tangent, tan&#948;, across a wide
+        frequency sweep — roughly 0.1&nbsp;mHz to 1&nbsp;kHz. The trouble is that tan&#948; doesn't
+        respond to moisture alone. Temperature and oil conductivity shift the same curve in
+        similar ways, so reading the plot by eye is unreliable.
+      </p>
+      <div class="formula-block">
+        <code>tan&#948; = F(MC, T, &sigma;<sub>oil</sub>, f)</code>
+        <span class="formula-caption">moisture content · temperature · oil conductivity · frequency, entangled</span>
+      </div>
+      <p>
+        This project's approach: measure the entangling clearly first, then let a classifier
+        learn the multivariate pattern across all 22 frequency points rather than reading any
+        single feature in isolation.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="characteristics" class="section section-alt">
+  <div class="wrap">
+    <p class="section-kicker">01 — FDS characteristics</p>
+    <h2>What moves the curve, and why it's ambiguous.</h2>
+    <div class="figure-stack">
+      <figure class="figure-card">
+        <img src="Task%2001/task1_outputs/task1a_moisture_effect.png" alt="Effect of moisture content on FDS loss tangent response" loading="lazy">
+        <figcaption>
+          <strong>Moisture content.</strong> Dry (0.3%) vs wet (5.2%) insulation at matched
+          temperature and oil conductivity. The wet sample's loss tangent rises sharply at
+          low frequency — moisture increases polarisation and ionic conduction in the
+          cellulose, making the low-frequency region the most diagnostic.
+        </figcaption>
+      </figure>
+      <figure class="figure-card">
+        <img src="Task%2001/task1_outputs/task1b_temperature_effect.png" alt="Effect of temperature on FDS loss tangent response" loading="lazy">
+        <figcaption>
+          <strong>Temperature.</strong> The same sample at 35°C and 65°C. Heat accelerates
+          polarisation and charge transport, shifting the whole curve along the frequency
+          axis — the same insulation can look like a different sample depending on
+          temperature alone.
+        </figcaption>
+      </figure>
+      <figure class="figure-card">
+        <img src="Task%2001/task1_outputs/task1c_oil_conductivity_effect.png" alt="Effect of oil conductivity on FDS loss tangent response" loading="lazy">
+        <figcaption>
+          <strong>Oil conductivity.</strong> Low vs high conductivity at fixed moisture and
+          temperature. High conductivity raises tan&#948; in a way that mimics moisture — exactly
+          the ambiguity that makes single-curve interpretation risky.
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="pca" class="section">
+  <div class="wrap">
+    <p class="section-kicker">02 — Correlation &amp; PCA</p>
+    <h2>22 features, mostly saying the same thing.</h2>
+    <div class="two-col">
+      <div class="prose-col">
+        <p>
+          Adjacent frequency points on an FDS curve move together — the loss tangent varies
+          smoothly. A Pearson correlation check across all 231 feature pairs confirmed it:
+          mean adjacent-feature correlation of <strong>0.9698</strong>, with 43 pairs
+          correlated above 0.95.
+        </p>
+        <p>
+          That redundancy is the case for dimensionality reduction. After a log&#8321;&#8320;
+          transform (loss tangent spans several decades) and standardisation, PCA collapses
+          the 22 features down dramatically:
+        </p>
+        <ul class="stat-list">
+          <li><span>PC&#8321;</span> 60.51% of variance</li>
+          <li><span>PC&#8321;+PC&#8322;</span> 91.04% of variance</li>
+          <li><span>+PC&#8323;</span> 97.90% of variance</li>
+        </ul>
+      </div>
+      <figure class="figure-card">
+        <img src="Task%2002/task2_outputs/task2_correlation_heatmap.png" alt="Correlation heatmap of the 22 FDS features" loading="lazy">
+        <figcaption>Correlation heatmap across all 22 FDS frequency features.</figcaption>
+      </figure>
+    </div>
+    <div class="figure-row">
+      <figure class="figure-card">
+        <img src="Task%2002/task2_outputs/task2_pca_scree_plot.png" alt="PCA scree plot and cumulative explained variance" loading="lazy">
+        <figcaption>Scree plot — variance explained per component.</figcaption>
+      </figure>
+      <figure class="figure-card">
+        <img src="Task%2002/task2_outputs/task2_2pc_score_scatter.png" alt="PCA score plot using the first two principal components" loading="lazy">
+        <figcaption>PC&#8321;–PC&#8322; score plot — the three classes separate cleanly even in 2D.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="classification" class="section section-alt">
+  <div class="wrap">
+    <p class="section-kicker">03 — Classification</p>
+    <h2>From a 2D projection to a tuned classifier.</h2>
+    <div class="prose-col">
+      <p>
+        70 samples (23 Dry, 23 Intermediate, 24 Wet), split 80/20 with stratification —
+        56 training, 14 held-out test. Everything log-transformed and standardised on
+        training statistics only, to avoid leakage.
+      </p>
+      <p>
+        The first classifier used only the two leading principal components — useful for
+        visualisation, matching the approach of Wijethunga et al. (CEIDP 2021). A linear SVM
+        on PC&#8321;/PC&#8322; alone reached <strong>85.71%</strong> test accuracy, with the confusion
+        concentrated exactly where you'd expect: Intermediate samples bleeding into Wet.
+      </p>
+    </div>
+    <div class="table-wrap figure-narrow">
+      <table class="results-table confusion-table">
+        <thead>
+          <tr><th></th><th>Pred. Dry</th><th>Pred. Intermediate</th><th>Pred. Wet</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Actual Dry</th><td class="cell-hit">5</td><td>0</td><td>0</td></tr>
+          <tr><th>Actual Intermediate</th><td>0</td><td class="cell-hit">2</td><td class="cell-miss">2</td></tr>
+          <tr><th>Actual Wet</th><td>0</td><td>0</td><td class="cell-hit">5</td></tr>
+        </tbody>
+      </table>
+      <p class="results-note">2PC-SVM confusion matrix — 2 of 4 Intermediate samples misclassified as Wet.</p>
+    </div>
+    <div class="prose-col">
+      <p>
+        Retaining all 22 standardised features and tuning the SVM (linear kernel, C=100,
+        5-fold CV) closed that gap: <strong>92.86%</strong> test accuracy, 13 of 14 correct.
+        A basic neural network (22&rarr;16&rarr;8&rarr;3) matched the 2PC baseline but not the
+        tuned SVM — with only 70 samples, there isn't enough data for a network to earn its
+        extra capacity. Augmenting the training set with SMOTE (56&rarr;280 synthetic samples)
+        closed that gap too, bringing the network to the same 92.86%.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="results" class="section">
+  <div class="wrap">
+    <p class="section-kicker">04 — Model comparison</p>
+    <h2>Four models, one clear winner.</h2>
+    <div class="table-wrap">
+      <table class="results-table">
+        <thead>
+          <tr><th>Model</th><th>Train/Val</th><th>Test</th><th>Note</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2PC&#8209;SVM</td><td>89.3%</td><td>85.7%</td>
+            <td>Good for visualisation; Intermediate/Wet overlap in 2D</td>
+          </tr>
+          <tr class="row-highlight">
+            <td>Tuned all&#8209;feature SVM</td><td>100.0%</td><td><strong>92.9%</strong></td>
+            <td>Selected as primary classifier — simplest model at best accuracy</td>
+          </tr>
+          <tr>
+            <td>Basic neural net</td><td>93.2 / 91.7%</td><td>85.7%</td>
+            <td>Underfits — too little data for the extra capacity</td>
+          </tr>
+          <tr>
+            <td>SMOTE&#8209;augmented NN</td><td>100.0 / 100.0%</td><td><strong>92.9%</strong></td>
+            <td>Matches tuned SVM once training data is synthetically expanded</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="results-note">
+      The tuned all-feature SVM was chosen as the primary classifier: highest test accuracy,
+      no synthetic data required, and computationally lighter than the neural network
+      alternative — the right call for a 70-sample dataset.
+    </p>
+  </div>
+</section>
+
+<section class="section section-cta">
+  <div class="wrap cta-row">
+    <div>
+      <h2>Read the full report or explore the code.</h2>
+      <p>Complete methodology, references, and further-work suggestions are in the repository.</p>
+    </div>
+    <a class="btn-primary" href="https://github.com/ishakkya145/High-Voltage-Mini-Project" target="_blank" rel="noreferrer">View on GitHub &rarr;</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap footer-row">
+    <p>Shakkya — Final-year Electrical Engineering, University of Peradeniya</p>
+    <p class="footer-meta">Group project EE.21.HV.03 · EE576 High Voltage Engineering</p>
+  </div>
+</footer>
+
+</body>
+</html>
